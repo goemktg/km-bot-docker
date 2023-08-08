@@ -11,6 +11,8 @@ client.login(process.env.DISCORD_TOKEN);
 // We use 'c' for the event parameter to keep it separate from the already defined 'client'
 client.once(Events.ClientReady, c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
+
+	client.user.setActivity('뉴비', { type: 'WATCHING' });
 });
 
 var isJobRunning = false;
@@ -18,7 +20,7 @@ var isJobRunning = false;
 cron.schedule("*/10 * * * * *", async function () {
 	if (isJobRunning)
 		return;
-		console.log("running a task every 10 seconds");
+		//console.log("running a task every 10 seconds");
 		isJobRunning = true;
 		// redisq zkillboard api 
 		// retives one killmail at one time
@@ -40,7 +42,7 @@ cron.schedule("*/10 * * * * *", async function () {
 			if (redisqData.package == null)
 				isKillmailExist = false;
 			else {
-				console.log(redisqData.package);
+				//console.log(redisqData.package);
 			
 				// create attacker db
 				var newbeeAttackerIDs = new Array();
@@ -73,8 +75,8 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs = null) {
 	idMap.set(package.killmail.solar_system_id, null);
 
 	for (let element of newbeeAttackerIDs) {
-		console.log('element:');
-		console.log(element);
+		//console.log('element:');
+		//console.log(element);
 		
 		idMap.set(element.character_id, null);
 		idMap.set(element.ship_type_id, null);
@@ -82,20 +84,20 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs = null) {
 	}
 	
 	const postData = JSON.stringify( Array.from(idMap.keys()) );
-	console.log('post: '+postData);
+	//console.log('post: '+postData);
 
 	// get name resolved
 	const EsiResponse = await fetch("https://esi.evetech.net/latest/universe/names/?datasource=tranquility", { method: "POST", headers: { 'User-Agent': 'Maintainer: Goem Funaila(IG) samktg52@gmail.com' }, body: postData } )
 	const EsiData = await JSON.parse(await EsiResponse.text());
 
-	console.log('Esi: ')
-	console.log(EsiData);
+	//console.log('Esi: ')
+	//console.log(EsiData);
 
 	// apply esi data
 	for (let element of EsiData) {
 		idMap.set(element.id, element.name);
 	}
-	console.log(idMap);
+	//console.log(idMap);
 
 	//                                      true : false
 	let embedColor = (type == 'lost') ? 0xFF0000 : 0x00FFFF

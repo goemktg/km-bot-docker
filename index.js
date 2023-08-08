@@ -130,7 +130,7 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs = null) {
 
 	killmailEmbed.addFields({ name: '\u200b', value: 'Total '+package.zkb.totalValue+' ISK' });
 
-	client.channels.cache.get('1138118432219484321').send({
+	client.channels.cache.get('1085519540265439272').send({
 		content: '뉴비 연관 킬메일 발생!',
 		embeds: [killmailEmbed],
 		});

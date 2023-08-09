@@ -12,7 +12,7 @@ client.login(process.env.DISCORD_TOKEN);
 client.once(Events.ClientReady, c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
 
-	client.user.setActivity('뉴비', { type: 'WATCHING' });
+	client.user.setActivity('뉴비', { type: ActivityType.Watching });
 });
 
 var isJobRunning = false;
@@ -128,7 +128,7 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs = null) {
 		killmailEmbed.addFields({ name: fieldName, value: idMap.get(element.character_id)+' flying in a '+idMap.get(element.ship_type_id)+' with '+idMap.get(element.weapon_type_id), inline: true })
 	}
 
-	killmailEmbed.addFields({ name: '\u200b', value: 'Total '+calcKillmailPrice(package.zkb.totalValue)+' ISK' });
+	killmailEmbed.addFields({ name: '\u200b', value: '**Total '+calcKillmailPrice(package.zkb.totalValue)+' ISK**, Droped '+calcKillmailPrice(package.zkb.droppedValue)+' ISK' });
 
 	client.channels.cache.get('1138118432219484321').send({
 		content: '뉴비 연관 킬메일 발생!',

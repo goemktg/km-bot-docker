@@ -1,4 +1,4 @@
-const { Client, Events, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, Events, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
 const cron = require("node-cron")
  
 // Create a new client instance

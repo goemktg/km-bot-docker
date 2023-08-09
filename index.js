@@ -55,12 +55,12 @@ cron.schedule("*/10 * * * * *", async function () {
 					});
 				})
 			
-				// check attackers
-				if (newbeeAttackerIDs.length)
-					pushKillmailMsg(redisqData.package, 'killed', newbeeAttackerIDs);
 				// check victim
-				else if (redisqData.package.killmail.victim.corporation_id == 98578021)
+				if (redisqData.package.killmail.victim.corporation_id == 98578021)
 					pushKillmailMsg(redisqData.package, 'lost');
+				// check attackers
+				else if (newbeeAttackerIDs.length)
+					pushKillmailMsg(redisqData.package, 'killed', newbeeAttackerIDs);
 			}
 		}
 		
@@ -128,10 +128,17 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs = null) {
 		killmailEmbed.addFields({ name: fieldName, value: idMap.get(element.character_id)+' flying in a '+idMap.get(element.ship_type_id)+' with '+idMap.get(element.weapon_type_id), inline: true })
 	}
 
-	killmailEmbed.addFields({ name: '\u200b', value: 'Total '+package.zkb.totalValue+' ISK' });
+	killmailEmbed.addFields({ name: '\u200b', value: 'Total '+calcKillmailPrice(package.zkb.totalValue)+' ISK' });
 
 	client.channels.cache.get('1138118432219484321').send({
 		content: '뉴비 연관 킬메일 발생!',
 		embeds: [killmailEmbed],
 		});
+}
+
+function calcKillmailPrice(rawKillmailPrice) {
+	if (rawKillmailPrice / 1000000000 >= 1) // 1b 이상
+		return (rawKillmailPrice % 1000000000).toLocaleString()+'B';
+	else if (rawKillmailPrice / 1000000 >= 1) // 1m 이상
+		return (rawKillmailPrice % 1000000).toLocaleString()+'M';
 }

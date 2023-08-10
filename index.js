@@ -14,14 +14,14 @@ client.once(Events.ClientReady, c => {
 
 	client.user.setActivity('뉴비', { type: ActivityType.Watching });
 
-	if (process.env.DEBUG)
-		processKillmail(process.env.DEBUG);
+	if (process.env.DEBUG === "true")
+		processKillmail(process.env.DEBUG === "true");
 });
 
 var isJobRunning = false;
 
 cron.schedule("*/10 * * * * *", async function () {
-	if (!process.env.DEBUG)
+	if (!(process.env.DEBUG === "true"))
 		processKillmail();
 	});
 
@@ -53,7 +53,7 @@ async function processKillmail(debug = false) {
 			if (debug)
 				console.log(redisqData.package);
 
-			console.log(redisqData.package.killID);
+			console.log('process: '+redisqData.package.killID);
 		
 			// create attacker db
 			var newbeeAttackerIDs = new Array();

@@ -41,11 +41,13 @@ async function processKillmail(debug = false) {
 	var isKillmailExist = true;
 
 	while (isKillmailExist) {
-		//const killboardResponse = '{"package":{"killID":110852967,"killmail":{"attackers":[{"alliance_id":99003581,"character_id":2117585878,"corporation_id":98609905,"damage_done":471,"final_blow":true,"security_status":1.6,"ship_type_id":28665,"weapon_type_id":2929}],"killmail_id":110852967,"killmail_time":"2023-08-07T18:09:20Z","solar_system_id":30000303,"victim":{"alliance_id":99007629,"character_id":2117835657,"corporation_id":98578021,"damage_taken":471,"items":[],"position":{"x":-238340018128.50443,"y":133390663016.32596,"z":218191617026.56125},"ship_type_id":670}},"zkb":{"locationID":40019048,"hash":"5a39b3d4d932770f6a25616e1f96ddd9896c6ed2","fittedValue":10000,"droppedValue":0,"destroyedValue":10000,"totalValue":10000,"points":1,"npc":false,"solo":false,"awox":false,"labels":["cat:6","#:1","pvp","loc:nullsec"],"href":"https://esi.evetech.net/v1/killmails/110852967/5a39b3d4d932770f6a25616e1f96ddd9896c6ed2/"}}}'
-		//const redisqData = JSON.parse(killboardResponse);
+		var killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php", { method: "GET"} );
+		var redisqData = await JSON.parse(await killboardResponse.text());
 
-		const killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php", { method: "GET"} );
-		const redisqData = await JSON.parse(await killboardResponse.text());
+		if (debug) {
+			killboardResponse = '{"package":{"killID":110852967,"killmail":{"attackers":[{"alliance_id":99003581,"character_id":2117585878,"corporation_id":98609905,"damage_done":471,"final_blow":true,"security_status":1.6,"ship_type_id":28665,"weapon_type_id":2929}],"killmail_id":110852967,"killmail_time":"2023-08-07T18:09:20Z","solar_system_id":30000303,"victim":{"alliance_id":99007629,"character_id":2117835657,"corporation_id":98578021,"damage_taken":471,"items":[],"position":{"x":-238340018128.50443,"y":133390663016.32596,"z":218191617026.56125},"ship_type_id":670}},"zkb":{"locationID":40019048,"hash":"5a39b3d4d932770f6a25616e1f96ddd9896c6ed2","fittedValue":10000,"droppedValue":34609968.64,"destroyedValue":10000,"totalValue":34609968.64,"points":1,"npc":false,"solo":false,"awox":false,"labels":["cat:6","#:1","pvp","loc:nullsec"],"href":"https://esi.evetech.net/v1/killmails/110852967/5a39b3d4d932770f6a25616e1f96ddd9896c6ed2/"}}}'
+			redisqData = JSON.parse(killboardResponse);
+		}
 
 		if (redisqData.package == null)
 			isKillmailExist = false;
@@ -152,9 +154,9 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 
 function calcKillmailPrice(rawKillmailPrice) {
 	if (rawKillmailPrice >= 1000000000) // 1b 이상
-		return (rawKillmailPrice % 1000000000).toLocaleString()+'B';
+		return (rawKillmailPrice / 1000000000).toLocaleString()+'B';
 	else if (rawKillmailPrice >= 1000000) // 1m 이상
-		return (rawKillmailPrice % 1000000).toLocaleString()+'M';
+		return (rawKillmailPrice / 1000000).toLocaleString()+'M';
 	else
 		return rawKillmailPrice.toLocaleString();
 }

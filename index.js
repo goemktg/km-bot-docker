@@ -52,16 +52,14 @@ async function processKillmail(debug = false) {
 		if (redisqData.package == null)
 			isKillmailExist = false;
 		else {
-			if (debug)
-				console.log(redisqData.package);
+			pushConsoleLog(redisqData.package, true);
 
-			console.log('process: '+redisqData.package.killID);
+			pushConsoleLog('process: '+redisqData.package.killID);
 		
 			// create attacker db
 			var newbeeAttackerIDs = new Array();
 			for (let element of redisqData.package.killmail.attackers) {
-				if (debug)
-					console.log(element);
+				pushConsoleLog(element, true);
 
 				if (element.corporation_id == 98578021 || element.final_blow == true && redisqData.package.killmail.victim.corporation_id == 98578021) {
 					newbeeAttackerIDs.push(element);
@@ -91,8 +89,8 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	idMap.set(package.killmail.solar_system_id, null);
 
 	for (let element of newbeeAttackerIDs) {
-		console.log('element:');
-		console.log(element);
+		pushConsoleLog('element:', true);
+		pushConsoleLog(element, true);
 		
 		idMap.set(element.character_id, null);
 		idMap.set(element.ship_type_id, null);
@@ -100,7 +98,7 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	}
 	
 	const postData = JSON.stringify( Array.from(idMap.keys()) );
-	console.log('post: '+postData);
+	pushConsoleLog('post: '+postData, true)
 
 	// get name resolved
 	const EsiResponse = await fetch("https://esi.evetech.net/latest/universe/names/?datasource=tranquility", { method: "POST", headers: { 'User-Agent': 'Maintainer: Goem Funaila(IG) samktg52@gmail.com' }, body: postData } )
@@ -169,4 +167,11 @@ function getShipAndWeaponString(ship, weapon) {
 		return returnString;
 
 	return returnString + ' with ' + weapon;
+}
+
+function pushConsoleLog(msg, debug = false) {
+	if (debug && process.env.DEBUG === "true")
+		console.log(msg);
+	else if (!debug)
+		console.log(msg);
 }

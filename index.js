@@ -42,7 +42,7 @@ async function processKillmail(debug = false) {
 	var isKillmailExist = true;
 
 	while (isKillmailExist) {
-		var killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php", { method: "GET"} );
+		var killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php?queueID=goemfunaila", { method: "GET"} );
 		var redisqData = await JSON.parse(await killboardResponse.text());
 
 		// overload data if debug

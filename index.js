@@ -85,7 +85,7 @@ async function processKillmail(debug = false) {
 
 			// check alliance kill
 			if (oldbeeAttackerIDs.length)
-				client.channels.cache.get(process.env.DISCORD_KM_POST_CHANNEL_ID).send('https://zkillboard.com/kill/'+redisqData.package.killID+'/');
+				pushKillmailMsg(redisqData.package, 'kill-100', oldbeeAttackerIDs);
 		}
 
 		if (debug)
@@ -95,14 +95,14 @@ async function processKillmail(debug = false) {
 	isJobRunning = false;
 }
 
-async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
+async function pushKillmailMsg(package, type, AttackerIDs) {
 	// make using id as array
 	var idMap = new Map();
 	idMap.set(package.killmail.victim.ship_type_id, null);
 	idMap.set(package.killmail.victim.character_id, null);
 	idMap.set(package.killmail.solar_system_id, null);
 
-	for (let element of newbeeAttackerIDs) {
+	for (let element of AttackerIDs) {
 		pushConsoleLog('element:', true);
 		pushConsoleLog(element, true);
 		
@@ -127,32 +127,38 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	}
 	//console.log(idMap);
 
-	//                                      true : false
-	const embedColor = (type == 'lost') ? 0xFF0000 : 0x00FFFF
+	//                                                 true : false
+	//											   0x00FFFF : cyan
+	//											   0xFF0000 : red
+	const embedColor = (type.startsWith('kill')) ? 0x00FFFF : 0xFF0000
 	//console.log(embedColor);
 
 	//                  Kill: Goem Funaila (Keres)
 	const embedTitle = 'Kill: '+idMap.get(package.killmail.victim.character_id)+' ('+idMap.get(package.killmail.victim.ship_type_id)+')';
 	//console.log(embedTitle);
-	// case lost) newbee **Goem Funaila** lost
+	// case lost) newbee **A** lost
 	//            flying in a **Praxis**
 	//            Final Blowed by
-	//            **Goem Funaila** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile
+	//            **B** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile
 	//
 	// case kill) newbee killed:
-	//            **Goem Funaila** flying in a **Praxis**
+	//            **A** flying in a **Praxis**
 	//            Involved Newbees:
-	//            **Goem Funaila** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile | **Goem Funaila** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile
-	
-	//                                                                                                             true : false
-	const killmailfFieldName = (type == 'lost') ? 'newbee **'+idMap.get(package.killmail.victim.character_id)+'** lost' : 'newbee killed:';
+	//            **B** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile | **C** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile
+	//
+	// case kill-100) alliance killed:
+	// 				  **A** flying in a **Praxis**
+	//				  Involved Members:
+	//                **B** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile | **C** flying in a **Praxis** with Caldari Navy Nova Heavy Assault Missile
 
-	const flyingInAShip = 'flying in a **'+idMap.get(package.killmail.victim.ship_type_id)+'**';
-	const killmailfFieldValue = (type == 'lost') ? flyingInAShip : '**'+idMap.get(package.killmail.victim.character_id)+'** '+flyingInAShip;
-	//                                                  ^   true : false
+	//                                                       true : false                                                                                        true : false
+	const field1 = ((type == 'lost' || type == 'kill') ? 'newbee' : 'alliance') + ((type == 'lost') ? ' **'+idMap.get(package.killmail.victim.character_id)+'** lost' : ' killed:');
 
-	//                                                         true : false
-	const elementFieldHeader = (type == 'lost') ? 'Final Blowed by' : 'Involved Newbees:';
+	//                               true : false
+	const field2 = ((type == 'lost') ? '' : '**'+idMap.get(package.killmail.victim.character_id)+'** ')+'flying in a **'+idMap.get(package.killmail.victim.ship_type_id)+'**';
+
+	//												true : false								   true : false								          true : false
+	const field3 = ((type == 'lost') ? 'Final Blowed by' : '') + ((type == 'kill') ? 'Involved Newbees' : '') + ((type == 'kill-100') ? 'Involved Members' : '')
 
 	const killmailEmbed = new EmbedBuilder()
 		.setColor(embedColor)
@@ -161,19 +167,20 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 		.setDescription('**Location:** \n'+idMap.get(package.killmail.solar_system_id))
 		.setThumbnail('https://images.evetech.net/types/'+package.killmail.victim.ship_type_id+'/render?size=128')
 		.addFields(
-			{ name: killmailfFieldName, value: killmailfFieldValue},
+			{ name: field1, value: field2},
 		);
 	
 	var isFristElement = true;
-	for (let element of newbeeAttackerIDs) {
+	for (let element of AttackerIDs) {
 		var fieldName = '\u200b';
 
 		if (isFristElement) {
-			fieldName = elementFieldHeader;
+			fieldName = field3;
 			isFristElement = false;
 		}
 
-		killmailEmbed.addFields({ name: fieldName, value: '**'+idMap.get(element.character_id)+'** flying in a '+getShipAndWeaponString(idMap.get(element.ship_type_id), idMap.get(element.weapon_type_id)), inline: true })
+		//																																																										 true : false
+		killmailEmbed.addFields({ name: fieldName, value: '**'+idMap.get(element.character_id)+'** flying in a **'+idMap.get(element.ship_type_id)+'**'+((element.ship_type_id != element.weapon_type_id) ? ' with '+idMap.get(element.weapon_type_id):''), inline: true });
 	}
 
 	killmailEmbed.addFields({ name: '\u200b', value: '**Total '+getPriceString(package.zkb.totalValue)+' ISK**, Droped '+getPriceString(package.zkb.droppedValue)+' ISK, Involved: **'+package.killmail.attackers.length+'**' });
@@ -191,15 +198,6 @@ function getPriceString(rawKillmailPrice) {
 		return getFormatedNumString(rawKillmailPrice / 1000000)+'M';
 	else
 		return getFormatedNumString(rawKillmailPrice);
-}
-
-function getShipAndWeaponString(ship, weapon) {
-	const returnString = '**'+ship+'**';
-
-	if (ship == weapon)
-		return returnString;
-
-	return returnString + ' with ' + weapon;
 }
 
 function pushConsoleLog(msg, debug = false) {

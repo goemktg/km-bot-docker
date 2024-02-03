@@ -13,7 +13,13 @@ client.once(Events.ClientReady, c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
 	console.log('debug: '+process.env.DEBUG);
 
-	client.user.setActivity('뉴비', { type: ActivityType.Watching });
+	client.user.setPresence({
+		activities: [{
+			type: ActivityType.Custom,
+			name: "custom", // name is exposed through the API but not shown in the client for ActivityType.Custom
+			state: "킬보드 감시 중",
+		}]
+	});
 
 	if (process.env.DEBUG === "true")
 		processKillmail(process.env.DEBUG === "true");

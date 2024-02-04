@@ -35,6 +35,7 @@ client.once(Events.ClientReady, c => {
 
 let isJobRunning = false;
 let isFirstJob = true;
+const debugQueueidAddition = (process.env.DEBUG === "true") ? 'Test' : '';
 
 cron.schedule("*/10 * * * * *", async function () {
 	if (!isJobRunning)
@@ -56,7 +57,7 @@ async function processKillmail(debug = false) {
 	var isKillmailExist = true;
 
 	while (isKillmailExist) {
-		var killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php?queueID=GoemFunaila", { method: "GET"} );
+		var killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php?queueID=GoemFunaila"+debugQueueidAddition, { method: "GET"} );
 		var redisqData = await JSON.parse(await killboardResponse.text());
 
 		//overload data once if debug

@@ -35,12 +35,19 @@ client.once(Events.ClientReady, c => {
 
 let isJobRunning = false;
 let isFirstJob = true;
+
 const debugQueueidAddition = (process.env.DEBUG === "true") ? 'Test' : '';
+const redisqURL = 'https://redisq.zkillboard.com/listen.php?queueID=GoemFunaila'+debugQueueidAddition;
+
+console.log('getting data from:'+redisqURL);
 
 cron.schedule("*/10 * * * * *", async function () {
-	if (!isJobRunning)
-		console.log('getting data...')
+	if (!isJobRunning) {
+		console.log('time to get data!');
 		processKillmail();
+	}
+	else
+		console.log('time to get data. but job is already running.');
 	});
 
 async function processKillmail(debug = false) {
@@ -49,18 +56,18 @@ async function processKillmail(debug = false) {
 	// redisq zkillboard api 
 	// retives one killmail at one time
 	// job flow
-	// 1) 10초마다 받아옴
-	// 2) 킬메일 받아오기 시작. 2-1) 혹은 2-2) 로 감
-	// 2-1) 킬메일 존재할 경우 꼽 아이디 확인 후 2로 돌아감
-	// 2-2) 킬메일 없을 경우 1)로 돌아감 (10초 대기)
+	// 1) 10초마다 2) 실행
+	// 2) 이미 3) 단계가 진행 중인경우 스킵, 아니라면 3)으로 감
+	// 3) 데이터 받아옴. null값 반환될 경우 (받아올 킬메일 없음) 스킵. 아니면 4)로 감
+	// 4) 해당 킬메일 처리 후 3로 돌아감
 
-	var isKillmailExist = true;
+	let isKillmailExist = true;
 
 	while (isKillmailExist) {
-		var killboardResponse = await fetch("https://redisq.zkillboard.com/listen.php?queueID=GoemFunaila"+debugQueueidAddition, { method: "GET"} );
+		var killboardResponse = await fetch(redisqURL, { method: "GET"} );
 		var redisqData = await JSON.parse(await killboardResponse.text());
 
-		//overload data once if debug
+		// 디버그 환경 및 첫 작업일 경우 데이터 덮어씀
 		if (debug && isFirstJob) {
 			//case kill
 			//killboardResponse = '{"package":{"killID":110946162,"killmail":{"attackers":[{"damage_done":239865,"faction_id":500021,"final_blow":false,"security_status":0,"ship_type_id":30212},{"character_id":91266835,"corporation_id":98438347,"damage_done":24964,"final_blow":true,"security_status":-0.3,"ship_type_id":29988,"weapon_type_id":29988},{"character_id":90803088,"corporation_id":98578021,"damage_done":8633,"final_blow":false,"security_status":-1.6,"ship_type_id":29986,"weapon_type_id":29986},{"character_id":322718659,"corporation_id":98578021,"damage_done":6798,"final_blow":false,"security_status":5,"ship_type_id":29986,"weapon_type_id":27401},{"character_id":90273223,"corporation_id":98438347,"damage_done":5864,"final_blow":false,"security_status":-0.8,"ship_type_id":29988,"weapon_type_id":2446},{"character_id":2113436920,"corporation_id":98739488,"damage_done":966,"faction_id":500003,"final_blow":false,"security_status":4.7,"ship_type_id":47466,"weapon_type_id":47466},{"character_id":450024655,"corporation_id":98490492,"damage_done":832,"final_blow":false,"security_status":5,"ship_type_id":29988,"weapon_type_id":2466}],"killmail_id":110946162,"killmail_time":"2023-08-12T12:57:09Z","solar_system_id":31001074,"victim":{"alliance_id":1220922756,"character_id":2120222883,"corporation_id":98691843,"damage_taken":287922,"items":[{"flag":14,"item_type_id":8135,"quantity_destroyed":1,"singleton":0},{"flag":5,"item_type_id":30013,"quantity_destroyed":8,"singleton":0},{"flag":20,"item_type_id":41054,"quantity_destroyed":1,"singleton":0},{"flag":25,"item_type_id":16535,"quantity_dropped":1,"singleton":0},{"flag":5,"item_type_id":33474,"quantity_destroyed":1,"singleton":0},{"flag":94,"item_type_id":26086,"quantity_destroyed":1,"singleton":0},{"flag":30,"item_type_id":24507,"quantity_destroyed":10,"singleton":0},{"flag":33,"item_type_id":24507,"quantity_destroyed":10,"singleton":0},{"flag":32,"item_type_id":33450,"quantity_dropped":1,"singleton":0},{"flag":16,"item_type_id":8135,"quantity_destroyed":1,"singleton":0},{"flag":27,"item_type_id":16475,"quantity_dropped":1,"singleton":0},{"flag":5,"item_type_id":4613,"quantity_dropped":1,"singleton":0},{"flag":28,"item_type_id":33450,"quantity_dropped":1,"singleton":0},{"flag":5,"item_type_id":33475,"quantity_dropped":1,"singleton":0},{"flag":29,"item_type_id":24507,"quantity_destroyed":10,"singleton":0},{"flag":28,"item_type_id":24507,"quantity_destroyed":10,"singleton":0},{"flag":11,"item_type_id":1248,"quantity_destroyed":1,"singleton":0},{"flag":29,"item_type_id":33450,"quantity_destroyed":1,"singleton":0},{"flag":5,"item_type_id":76114,"quantity_destroyed":6,"singleton":0},{"flag":32,"item_type_id":24507,"quantity_destroyed":10,"singleton":0},{"flag":33,"item_type_id":33450,"quantity_dropped":1,"singleton":0},{"flag":92,"item_type_id":26374,"quantity_destroyed":1,"singleton":0},{"flag":24,"item_type_id":2281,"quantity_destroyed":1,"singleton":0},{"flag":5,"item_type_id":24507,"quantity_destroyed":15366,"singleton":0},{"flag":30,"item_type_id":33450,"quantity_dropped":1,"singleton":0},{"flag":31,"item_type_id":24507,"quantity_destroyed":10,"singleton":0},{"flag":12,"item_type_id":1248,"quantity_destroyed":1,"singleton":0},{"flag":15,"item_type_id":8135,"quantity_destroyed":1,"singleton":0},{"flag":5,"item_type_id":28668,"quantity_dropped":17,"singleton":0},{"flag":87,"item_type_id":31890,"quantity_destroyed":2,"singleton":0},{"flag":87,"item_type_id":31890,"quantity_dropped":3,"singleton":0},{"flag":22,"item_type_id":2281,"quantity_dropped":1,"singleton":0},{"flag":87,"item_type_id":31894,"quantity_destroyed":3,"singleton":0},{"flag":87,"item_type_id":31894,"quantity_dropped":2,"singleton":0},{"flag":93,"item_type_id":4397,"quantity_destroyed":1,"singleton":0},{"flag":17,"item_type_id":2048,"quantity_dropped":1,"singleton":0},{"flag":21,"item_type_id":13953,"quantity_destroyed":1,"singleton":0},{"flag":19,"item_type_id":5443,"quantity_dropped":1,"singleton":0},{"flag":5,"item_type_id":17938,"quantity_dropped":1,"singleton":0},{"flag":31,"item_type_id":33450,"quantity_dropped":1,"singleton":0},{"flag":87,"item_type_id":2488,"quantity_destroyed":4,"singleton":0},{"flag":87,"item_type_id":2488,"quantity_dropped":2,"singleton":0},{"flag":23,"item_type_id":41218,"quantity_destroyed":1,"singleton":0},{"flag":13,"item_type_id":1248,"quantity_destroyed":1,"singleton":0}],"position":{"x":-106675567338.35883,"y":-53284704281.52799,"z":637580135899.0309},"ship_type_id":47466}},"zkb":{"locationID":40406890,"hash":"df5710fe59fd96e09cbaa381cd52906bc7f919a6","fittedValue":374428881.32,"droppedValue":43312011.33,"destroyedValue":378840295.1,"totalValue":422152306.43,"points":7,"npc":false,"solo":false,"awox":false,"labels":["cat:6","#:5+","pvp","loc:w-space"],"href":"https://esi.evetech.net/v1/killmails/110946162/df5710fe59fd96e09cbaa381cd52906bc7f919a6/"}}}'
@@ -70,11 +77,12 @@ async function processKillmail(debug = false) {
 
 			isFirstJob = false;
 		}
+		
+		//pushConsoleLog(redisqData.package, true);
 
 		if (redisqData.package == null)
 			isKillmailExist = false;
 		else {
-			pushConsoleLog(redisqData.package, true);
 
 			pushConsoleLog('process: '+redisqData.package.killID);
 		
@@ -83,7 +91,7 @@ async function processKillmail(debug = false) {
 			// create oldbee attacker id array
 			var oldbeeAttackerIDs = new Array();
 			for (let element of redisqData.package.killmail.attackers) {
-				pushConsoleLog(element, true);
+				//pushConsoleLog(element, true);
 
 				if (element.corporation_id == 98578021 || element.final_blow == true && redisqData.package.killmail.victim.corporation_id == 98578021) {
 					newbeeAttackerIDs.push(element);
@@ -104,9 +112,6 @@ async function processKillmail(debug = false) {
 			if (oldbeeAttackerIDs.length)
 				client.channels.cache.get(process.env.DISCORD_KM_POST_CHANNEL_ID).send('https://zkillboard.com/kill/'+redisqData.package.killID+'/');
 		}
-
-		if (debug)
-			break;
 	}
 	
 	isJobRunning = false;
@@ -120,8 +125,8 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	idMap.set(package.killmail.solar_system_id, null);
 
 	for (let element of newbeeAttackerIDs) {
-		pushConsoleLog('element:', true);
-		pushConsoleLog(element, true);
+		//pushConsoleLog('element:', true);
+		//pushConsoleLog(element, true);
 		
 		idMap.set(element.character_id, null);
 		idMap.set(element.ship_type_id, null);
@@ -129,7 +134,7 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	}
 	
 	const postData = JSON.stringify( Array.from(idMap.keys()) );
-	pushConsoleLog('post: '+postData, true)
+	//pushConsoleLog('post: '+postData, true)
 
 	// get name resolved
 	const EsiResponse = await fetch("https://esi.evetech.net/latest/universe/names/?datasource=tranquility", { method: "POST", headers: { 'User-Agent': 'Maintainer: Goem Funaila(IG) samktg52@gmail.com' }, body: postData } )

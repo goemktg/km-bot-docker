@@ -16,7 +16,7 @@ jobs:
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: goemktg/newbee-stalker-bot-docker
+          images: goemktg/newbee-stalker-bot
           tag-semver: |
             {{version}}
             {{major}}.{{minor}}

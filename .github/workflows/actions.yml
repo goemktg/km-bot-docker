@@ -18,7 +18,7 @@ jobs:
         with:
           images: |
             goemktg/newbee-stalker-bot
-          tag-semver: |
+          tags: |
             type=semver,pattern={{version}}
       -
         name: Set up Docker Buildx

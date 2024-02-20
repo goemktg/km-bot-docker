@@ -60,11 +60,13 @@ async function processKillmail() {
 		var killboardResponse = await fetch(redisqURL, { method: "GET" });
 		var redisqData = await JSON.parse(await killboardResponse.text());
 
-		if (redisqData.package == null)
+		if (redisqData.package == null) {
+			console.log('no killmail returned. skip killmail process.');
 			isKillmailExist = false;
+		}
 		else {
 
-			console.log('process: ' + redisqData.package.killID);
+			console.log('processed: ' + redisqData.package.killID);
 
 			// create newbee attacker id array
 			var newbeeAttackerIDs = new Array();

@@ -92,6 +92,13 @@ async function processKillmail() {
 				client.channels.cache.get(process.env.DISCORD_KM_POST_CHANNEL_ID).send('https://zkillboard.com/kill/' + redisqData.package.killID + '/');
 			}
 		}
+
+		// wait 500ms
+		await new Promise((resolve) => {
+			setTimeout(() => {
+				resolve();
+			}, 500);
+		});
 	}
 
 	isJobRunning = false;

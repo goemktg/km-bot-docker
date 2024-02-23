@@ -1,19 +1,29 @@
-const { Client, Events, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
-const { loadEnvironmentVariables } = require('./library/functions.js');
+const { Client, Events, GatewayIntentBits, EmbedBuilder, ActivityType, AuditLogEvent } = require('discord.js');
+const { loadEnvironmentVariables, getAuditTargetNickname } = require('./library/functions.js');
 const cron = require('node-cron');
 const axios = require('axios');
 
 loadEnvironmentVariables();
 
-// client 인스턴스 생성
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-// discord token을 사용해 client 로그인
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration] });
 client.login(process.env.DISCORD_TOKEN);
 
-// client가 준비되면 이 코드 실행 ( 한번만 실행됨 )
-client.once(Events.ClientReady, c => {
+const newbieData = new Map();
+client.once(Events.ClientReady, async c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
+	console.log('Loading newbie data...');
+	const members = await client.guilds.cache.get('337276039858356224').members.fetch();
+	const newbieNames = members.filter(member => member.roles.cache.has('1210191232756621383')).map(member => member.nickname);
+
+	const esiRequest = new (require('./library/esi-request.js'))();
+	const newbieRawDatas = (await esiRequest.getIdFromName(newbieNames)).characters;
+
+	newbieRawDatas.forEach(newbie => {
+		newbieData.set(newbie.name, newbie.id);
+	});
+
+	console.log('newbie data loaded!:');
+	console.log(newbieData);
 
 	// 봇 상태메시지 설정
 	client.user.setPresence({
@@ -25,9 +35,24 @@ client.once(Events.ClientReady, c => {
 	});
 });
 
+client.on(Events.GuildAuditLogEntryCreate, async auditLog => {
+	if (auditLog.action != AuditLogEvent.MemberRoleUpdate || auditLog.changes[0].new[0].id != '1210191232756621383') {return;}
 
-const redisqURL = 'https://redisq.zkillboard.com/listen.php?queueID=Goem_Funaila';
-console.log('getting data from:' + redisqURL);
+	const nickname = await getAuditTargetNickname(auditLog, client);
+	const Id = newbieData.get(nickname);
+
+	if (Id === undefined && auditLog.changes[0].key === '$add') {
+		const esiRequest = new (require('./library/esi-request.js'))();
+		esiRequest.getIdFromName([nickname]).then(newbie => {
+			newbieData.set(newbie.characters[0].name, newbie.characters[0].id);
+		});
+	}
+	else if (Id !== undefined && auditLog.changes[0].key === '$remove') {
+		newbieData.delete(nickname);
+	}
+
+	console.log('newbie data changed: ', newbieData);
+});
 
 let isJobRunning = false;
 cron.schedule('* * * * *', async function() {
@@ -40,61 +65,63 @@ cron.schedule('* * * * *', async function() {
 	}
 });
 
-async function processKillmail() {
+const redisqURL = 'https://redisq.zkillboard.com/listen.php?queueID=Goem_Funaila';
+console.log('getting data from:' + redisqURL);
+
+async function processKillmail(testData = null) {
 	isJobRunning = true;
 	let isKillmailExist = true;
 
 	while (isKillmailExist) {
-		const redisqData = await axios.get(redisqURL)
-			.then(response => response.data);
+		let redisqData = (await axios.get(redisqURL)).data.package;
+		if (testData != null) {redisqData = JSON.parse(testData).package;}
 
-		if (redisqData.package == null) {
+		if (redisqData == null) {
 			console.log('no killmail returned. skip killmail process.');
 			isKillmailExist = false;
+			isJobRunning = false;
+			return;
 		}
-		else {
+		let isPushed = false;
 
-			console.log('processed: ' + redisqData.package.killID);
+		const newbieIds = Array.from(newbieData.values());
 
-			const newbeeAttackerIDs = new Array();
-			const oldbeeAttackerIDs = new Array();
-			for (const element of redisqData.package.killmail.attackers) {
+		const attackersNewbee = redisqData.killmail.attackers.filter(attacker => newbieIds.includes(attacker.character_id));
+		const attackersOldbee = redisqData.killmail.attackers.filter(attacker => attacker.alliance_id == 99010412);
 
-				if (element.corporation_id == 98578021 || (element.final_blow == true && redisqData.package.killmail.victim.corporation_id == 98578021)) {
-					newbeeAttackerIDs.push(element);
-				}
-
-				if (element.alliance_id == 99010412 && redisqData.package.zkb.totalValue >= 100000000) {
-					oldbeeAttackerIDs.push(element);
-				}
-			}
-
-			// check victim
-			if (redisqData.package.killmail.victim.corporation_id == 98578021) {
-				pushKillmailMsg(redisqData.package, 'lost', newbeeAttackerIDs);
-			}
-			// check attackers
-			else if (newbeeAttackerIDs.length) {
-				pushKillmailMsg(redisqData.package, 'kill', newbeeAttackerIDs);
-			}
-
-			// check alliance kill
-			if (oldbeeAttackerIDs.length) {
-				client.channels.cache.get(process.env.DISCORD_KM_POST_CHANNEL_ID).send('https://zkillboard.com/kill/' + redisqData.package.killID + '/');
-			}
+		if (newbieIds.includes(redisqData.killmail.victim.character_id)) {
+			pushKillmailMsg(redisqData, 'lost', attackersNewbee);
+			isPushed = true;
+			console.log('processed: ' + redisqData.killID + ' - type: newbee lost');
+		}
+		else if (attackersNewbee.length != 0) {
+			pushKillmailMsg(redisqData, 'kill', attackersNewbee);
+			isPushed = true;
+			console.log('processed: ' + redisqData.killID + ' - type: newbee kill');
 		}
 
-		// wait 500ms
+		if (attackersOldbee.length != 0 && redisqData.zkb.totalValue >= 100000000) {
+			client.channels.cache.get(process.env.DISCORD_KM_POST_CHANNEL_ID).send('https://zkillboard.com/kill/' + redisqData.killID + '/');
+			isPushed = true;
+			console.log('processed: ' + redisqData.killID + ' - type: oldbee kill');
+
+		}
+
+		if (!isPushed) {console.log('processed: ' + redisqData.killID);}
+
 		await new Promise((resolve) => {
 			setTimeout(() => {
 				resolve();
 			}, 500);
 		});
+
+		if (testData != null) {isKillmailExist = false;}
 	}
 
 	isJobRunning = false;
 }
 
+// TODO: 재작성 하기
 async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	// make using id as array
 	const idMap = new Map();
@@ -179,31 +206,16 @@ async function pushKillmailMsg(package, type, newbeeAttackerIDs) {
 	});
 }
 
-
-// TODO: getPriceString 함수와 getFormatedNumString 함수를 통합할 수 있을 것 같음
 function getPriceString(rawKillmailPrice) {
-	let returnString = '';
-
-	if (rawKillmailPrice >= 1000000000) {
-		// 1b 이상
-		returnString = getFormatedNumString(rawKillmailPrice / 1000000000) + 'B';
+	if (rawKillmailPrice >= 1e9) {
+		return (rawKillmailPrice / 1e9).toFixed(2) + 'B';
 	}
-	else if (rawKillmailPrice >= 1000000) {
-		// 1m 이상
-		returnString = getFormatedNumString(rawKillmailPrice / 1000000) + 'M';
+	else if (rawKillmailPrice >= 1e6) {
+		return (rawKillmailPrice / 1e6).toFixed(2) + 'M';
 	}
 	else {
-		returnString = getFormatedNumString(rawKillmailPrice);
+		return rawKillmailPrice.toFixed(2);
 	}
-
-	return returnString;
-}
-
-function getFormatedNumString(float) {
-	return (Math.floor(float * 100) / 100).toLocaleString(undefined, {
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	});
 }
 
 function getShipAndWeaponString(ship, weapon) {
@@ -215,3 +227,5 @@ function getShipAndWeaponString(ship, weapon) {
 
 	return returnString + ' with ' + weapon;
 }
+
+module.exports = processKillmail;

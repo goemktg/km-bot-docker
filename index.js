@@ -16,7 +16,7 @@ client.once(Events.ClientReady, async c => {
 	const newbieNames = members.filter(member => member.roles.cache.has('1210191232756621383')).map(member => member.nickname);
 
 	const esiRequest = new (require('./library/esi-request.js'))();
-	const newbieRawDatas = (await esiRequest.getIdFromName(newbieNames)).characters;
+	const newbieRawDatas = (await esiRequest.getIdsFromNames(newbieNames)).characters;
 
 	newbieRawDatas.forEach(newbie => {
 		newbieData.set(newbie.name, newbie.id);
@@ -43,7 +43,7 @@ client.on(Events.GuildAuditLogEntryCreate, async auditLog => {
 
 	if (Id === undefined && auditLog.changes[0].key === '$add') {
 		const esiRequest = new (require('./library/esi-request.js'))();
-		esiRequest.getIdFromName([nickname]).then(newbie => {
+		esiRequest.getIdsFromNames([nickname]).then(newbie => {
 			newbieData.set(newbie.characters[0].name, newbie.characters[0].id);
 		});
 	}
@@ -73,8 +73,17 @@ async function processKillmail(testData = null) {
 	let isKillmailExist = true;
 
 	while (isKillmailExist) {
-		let redisqData = (await axios.get(redisqURL)).data.package;
-		if (testData != null) {redisqData = JSON.parse(testData).package;}
+		let redisqData;
+		try {
+			redisqData = (await axios.get(redisqURL)).data.package;
+		}
+		catch (error) {
+			console.log('WARN: error occured while getting killmail data. skip killmail process.');
+			console.log(error);
+			isKillmailExist = false;
+			isJobRunning = false;
+			return;
+		}
 
 		if (redisqData == null) {
 			console.log('no killmail returned. skip killmail process.');
@@ -82,6 +91,9 @@ async function processKillmail(testData = null) {
 			isJobRunning = false;
 			return;
 		}
+
+		if (testData != null) {redisqData = JSON.parse(testData).package;}
+
 		let isPushed = false;
 
 		const newbieIds = Array.from(newbieData.values());

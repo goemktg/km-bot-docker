@@ -6,7 +6,7 @@ import log from 'loglevel';
 
 loadEnvironmentVariables();
 
-if (!process.env.LOG_LEVEL) process.env.LOG_LEVEL = log.levels.INFO.toString();
+if (!process.env.LOG_LEVEL) process.env.LOG_LEVEL = 'INFO';
 log.setDefaultLevel(process.env.LOG_LEVEL as log.LogLevelDesc);
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration] });

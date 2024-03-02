@@ -39,42 +39,17 @@ export class KillboardSubscriber {
 			await setTimeout(10000);
 		}
 
-		let subscribingObjects: subscribingObject[];
-
 		if (!process.env.DEBUG) {
 			log.warn('DEBUG_MODE is not defined. defaulting to false.');
 			process.env.DEBUG = 'false';
 		}
 
-		if (process.env.DEBUG === 'false') {
-			subscribingObjects = [{
-				'action': 'sub',
-				'channel': 'alliance:99010412',
-			}];
+		const subscribingObject: subscribingObject = {
+			'action': 'sub',
+			'channel': 'killstream',
+		};
 
-			for (const [id] of this.newbieMap) {
-				subscribingObjects.push({
-					'action': 'sub',
-					'channel': `character:${id}`,
-				});
-			}
-		}
-		else if (process.env.DEBUG === 'true') {
-			log.info('debug mode. subscribing to entire killstream...');
-			subscribingObjects = [{
-				'action': 'sub',
-				'channel': 'killstream',
-			}];
-		}
-		else {
-			throw new Error('DEBUG MODE is not boolean. It must be true/false.');
-		}
-
-		log.info('subscribing to:');
-		log.info(subscribingObjects);
-		for (const subscribingObject of subscribingObjects) {
-			this.socket.send(JSON.stringify(subscribingObject));
-		}
+		this.socket.send(JSON.stringify(subscribingObject));
 		log.info('subscribed to killboard.');
 	}
 
@@ -92,7 +67,7 @@ export class KillboardSubscriber {
 			void this.newbieChannel.send(`뉴비 연관 킬메일 발생! https://zkillboard.com/kill/${response.killmail_id}/`);
 		}
 
-		if (response.zkb.totalValue >= 100000000) {
+		if (this.isAllianceKillmail(response.attackers) && response.zkb.totalValue >= 100000000) {
 			log.info('High value killmail detected! Posting to channel...');
 			void this.killmailPostChannel.send(`https://zkillboard.com/kill/${response.killmail_id}/`);
 		}
@@ -103,6 +78,13 @@ export class KillboardSubscriber {
 
 		const newbies = attackers.filter(attacker => {attacker.character_id && this.newbieMap.has(attacker.character_id.toString());});
 		if (newbies.length > 0) return true;
+
+		return false;
+	}
+
+	isAllianceKillmail(attackers: KillmailAttacker[]) {
+		const allianceMembers = attackers.filter(attacker => {attacker.alliance_id && attacker.alliance_id === 99010412;});
+		if (allianceMembers.length > 0) return true;
 
 		return false;
 	}

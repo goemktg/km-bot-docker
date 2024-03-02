@@ -5,7 +5,9 @@ import { EveCharacterBase, KillboardSubscriber } from './killboardSubscriber';
 import log from 'loglevel';
 
 loadEnvironmentVariables();
-log.setDefaultLevel('TRACE');
+
+if (!process.env.LOG_LEVEL) process.env.LOG_LEVEL = log.levels.INFO.toString();
+log.setDefaultLevel(process.env.LOG_LEVEL as log.LogLevelDesc);
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration] });
 const killboardSubscriber = new KillboardSubscriber();
@@ -58,6 +60,7 @@ client.once(Events.ClientReady, async c => {
 	if (!newbieChannel || !killmailPostChannel) {throw new Error('Channel ID is Invalid');}
 	killboardSubscriber.newbieChannel = newbieChannel;
 	killboardSubscriber.killmailPostChannel = killmailPostChannel;
+	log.info('registered killmail post channels.');
 });
 
 client.on(Events.GuildAuditLogEntryCreate, async (auditLog, guild) => {

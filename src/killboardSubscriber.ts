@@ -59,7 +59,7 @@ export class KillboardSubscriber {
 			await setTimeout(10000);
 		}
 
-		log.info(`Killmail detected: ${response.killmail_id}`);
+		log.debug(`Killmail detected: ${response.killmail_id}`);
 		log.debug(response);
 
 		if (this.isNewbieKillmail(response.attackers, response.victim)) {

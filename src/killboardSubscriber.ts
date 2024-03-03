@@ -39,17 +39,13 @@ export class KillboardSubscriber {
 			await setTimeout(10000);
 		}
 
-		if (!process.env.DEBUG) {
-			log.warn('DEBUG_MODE is not defined. defaulting to false.');
-			process.env.DEBUG = 'false';
-		}
-
-		const subscribingObject: subscribingObject = {
+		const subscribingObject: object = {
 			'action': 'sub',
 			'channel': 'killstream',
 		};
 
 		this.socket.send(JSON.stringify(subscribingObject));
+		log.debug(JSON.stringify(subscribingObject));
 		log.info('subscribed to killboard.');
 	}
 
@@ -71,20 +67,26 @@ export class KillboardSubscriber {
 			log.info('High value killmail detected! Posting to channel...');
 			void this.killmailPostChannel.send(`https://zkillboard.com/kill/${response.killmail_id}/`);
 		}
+
+		log.debug(response.victim.character_id);
 	}
 
 	isNewbieKillmail(attackers: KillmailAttacker[], victim: KillmailVictim) {
-		if (victim.character_id && this.newbieMap.get(victim.character_id.toString())) return true;
+		if (victim.character_id && this.newbieMap.has(victim.character_id.toString())) return true;
 
-		const newbies = attackers.filter(attacker => {attacker.character_id && this.newbieMap.has(attacker.character_id.toString());});
-		if (newbies.length > 0) return true;
+		const attackerIds = attackers.map(attacker => attacker.character_id);
+		log.debug(attackerIds);
+
+		if (attackerIds.filter(attackerId => this.newbieMap.has(attackerId?.toString() ?? '')).length > 0) return true;
 
 		return false;
 	}
 
 	isAllianceKillmail(attackers: KillmailAttacker[]) {
-		const allianceMembers = attackers.filter(attacker => {attacker.alliance_id && attacker.alliance_id === 99010412;});
-		if (allianceMembers.length > 0) return true;
+		const attackerAllianceIds = attackers.map(attacker => (attacker.alliance_id)) as number[];
+		log.debug(attackerAllianceIds);
+
+		if (attackerAllianceIds.includes(99010412)) return true;
 
 		return false;
 	}
@@ -150,9 +152,4 @@ interface KillmailZkillboardData {
     awox: boolean,
     esi: string,
     url: string,
-}
-
-export interface subscribingObject {
-    action: string,
-    channel: string,
 }

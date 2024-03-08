@@ -49,9 +49,6 @@ client.once(Events.ClientReady, async c => {
 
 	setDiscordPresence(client, '킬보드 감시 중');
 
-	log.info('Subscribing to kill feed...');
-	void killboardSubscriber.subscribeToKillboard();
-
 	log.info('registing killmail post channels...');
 	if (!process.env.DISCORD_KM_POST_CHANNEL_ID || !process.env.DISCORD_NEWBEE_CHANNEL_ID) {throw new Error('DISCORD_KM_POST_CHANNEL_ID or DISCORD_NEWBEE_CHANNEL_ID is not defined.');}
 	const newbieChannel = client.channels.cache.get(process.env.DISCORD_NEWBEE_CHANNEL_ID) as TextChannel;
@@ -61,6 +58,8 @@ client.once(Events.ClientReady, async c => {
 	killboardSubscriber.newbieChannel = newbieChannel;
 	killboardSubscriber.killmailPostChannel = killmailPostChannel;
 	log.info('registered killmail post channels.');
+
+	void killboardSubscriber.createSocketConnection();
 });
 
 client.on(Events.GuildAuditLogEntryCreate, async (auditLog, guild) => {
@@ -68,7 +67,6 @@ client.on(Events.GuildAuditLogEntryCreate, async (auditLog, guild) => {
 
 	const nickname = await getAuditTargetNickname(auditLog, guild);
 	void reflectNewbieRoleChange(auditLog, nickname, add, remove);
-	log.info('registered killmail post channels.');
 });
 
 function add(nickname: string) {

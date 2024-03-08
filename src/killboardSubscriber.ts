@@ -1,71 +1,64 @@
 import { WebSocket } from 'ws';
-import { setTimeout } from 'timers/promises';
 import log from 'loglevel';
 import { TextChannel } from 'discord.js';
 
 export class KillboardSubscriber {
-	private socket: WebSocket;
-	private isSocketOpen: boolean;
 	public newbieMap: Map<string, string>;
+	private socket: WebSocket | undefined;
 	public newbieChannel: TextChannel | undefined;
 	public killmailPostChannel: TextChannel | undefined;
 
 	constructor() {
 		this.newbieMap = new Map();
-		log.info('Creating Socket Connection with ZKillboard...');
+	}
 
-		this.isSocketOpen = false;
+	createSocketConnection() {
+		log.info('Creating socket connection with zKillboard...');
 		this.socket = new WebSocket('wss://zkillboard.com/websocket/');
 
 		this.socket.on('open', () => {
-			log.info('Created Socket connection with ZKillboard.');
-			this.isSocketOpen = true;
+			log.info('Created socket connection with zKillboard.');
+
+			log.info('Subscribing to kill feed...');
+			void this.subscribeToKillboard();
 		});
 
 		this.socket.on('message', (message: string) => {
-			// log.trace(`Received message from server: ${message}`);
+			log.trace(`Received message from server: ${message}`);
 
 			void this.processKillmail(JSON.parse(message) as APIKillboardResponse);
 		});
 
 		this.socket.on('close', () => {
 			log.error('Socket connection with ZKillboard has been closed. Attempting to reconnect...');
+
+			this.createSocketConnection();
 		});
 	}
 
-	async subscribeToKillboard() {
-		while (!this.isSocketOpen) {
-			log.warn('Socket is not open yet. Waiting 10 second...');
-			await setTimeout(10000);
-		}
-
+	subscribeToKillboard() {
 		const subscribingObject: object = {
 			'action': 'sub',
 			'channel': 'killstream',
 		};
 
-		this.socket.send(JSON.stringify(subscribingObject));
+		(this.socket as WebSocket).send(JSON.stringify(subscribingObject));
 		log.debug(JSON.stringify(subscribingObject));
-		log.info('subscribed to killboard.');
+		log.info('Subscribed to kill feed.');
 	}
 
-	async processKillmail(response: APIKillboardResponse) {
-		while (!this.newbieChannel || !this.killmailPostChannel) {
-			log.warn('Not Recived Channel Data. Waiting 10 second...');
-			await setTimeout(10000);
-		}
-
+	processKillmail(response: APIKillboardResponse) {
 		log.debug(`Killmail detected: ${response.killmail_id}`);
 		log.debug(response);
 
 		if (this.isNewbieKillmail(response.attackers, response.victim)) {
 			log.info('Newbie killmail detected! Posting to channel...');
-			void this.newbieChannel.send(`뉴비 연관 킬메일 발생! https://zkillboard.com/kill/${response.killmail_id}/`);
+			void (this.newbieChannel as TextChannel).send(`뉴비 연관 킬메일 발생! https://zkillboard.com/kill/${response.killmail_id}/`);
 		}
 
 		if (this.isAllianceKillmail(response.attackers) && response.zkb.totalValue >= 100000000) {
 			log.info('High value killmail detected! Posting to channel...');
-			void this.killmailPostChannel.send(`https://zkillboard.com/kill/${response.killmail_id}/`);
+			void (this.killmailPostChannel as TextChannel).send(`https://zkillboard.com/kill/${response.killmail_id}/`);
 		}
 
 		log.debug(response.victim.character_id);

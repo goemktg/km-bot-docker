@@ -13,13 +13,11 @@ export class KillboardSubscriber {
 	}
 
 	createSocketConnection() {
-		log.info('Creating socket connection with zKillboard...');
 		this.socket = new WebSocket('wss://zkillboard.com/websocket/');
 
 		this.socket.on('open', () => {
 			log.info('Created socket connection with zKillboard.');
 
-			log.info('Subscribing to kill feed...');
 			void this.subscribeToKillboard();
 		});
 

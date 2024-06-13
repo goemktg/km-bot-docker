@@ -1,12 +1,14 @@
 import { WebSocket } from 'ws';
-import log from 'loglevel';
 import { TextChannel } from 'discord.js';
+import log from 'loglevel';
+import fs from 'fs';
 
 export class KillboardSubscriber {
 	public newbieMap: Map<string, string>;
 	private socket: WebSocket | undefined;
 	public newbieChannel: TextChannel | undefined;
 	public killmailPostChannel: TextChannel | undefined;
+	private timeout: NodeJS.Timeout | undefined;
 
 	constructor() {
 		this.newbieMap = new Map();
@@ -26,10 +28,18 @@ export class KillboardSubscriber {
 			(this.socket as WebSocket).send(JSON.stringify(subscribingObject));
 			log.debug(JSON.stringify(subscribingObject));
 			log.info('Subscribed to kill feed.');
+
+			fs.writeFileSync('status.json', '{"status": "ok"}');
+			this.startWriteStatus();
 		});
 
 		this.socket.on('message', (message: string) => {
 			log.trace(`Received message from server: ${message}`);
+
+			if (this.timeout === undefined) {throw new Error('Timeout is not defined.');}
+
+			clearTimeout(this.timeout);
+			this.startWriteStatus();
 
 			void this.processKillmail(JSON.parse(message) as APIKillboardResponse);
 		});
@@ -62,12 +72,12 @@ export class KillboardSubscriber {
 		log.debug(response.victim.character_id);
 	}
 
-
 	/**
 	 * 킬메일이 뉴비 킬메일인지 고액 킬메일인지 아무것도 아닌지 판단하여 맞는 타입을 리턴합니다.
 	 * @returns {0: 뉴비 킬메일| 1: 고액 킬메일| 2: 아무것도 아님}
 	 */
 	findOutKillmailType(response: APIKillboardResponse) : 0 | 1 | 2 {
+		log.debug(response);
 		// 뉴비가 사망
 		if (this.newbieMap.has(response.victim.character_id.toString())) return 0;
 		const isExpansiveKillmail = response.zkb.totalValue >= 100000000;
@@ -79,6 +89,16 @@ export class KillboardSubscriber {
 		}
 
 		return 2;
+	}
+
+	/**
+	 * 킬메일 소캣 프로그래밍의 상태를 status.json 파일에 저장합니다.
+	 */
+	startWriteStatus() {
+		this.timeout = setTimeout(() => {
+			log.error('zkillboard socket is not responding...');
+			fs.writeFileSync('status.json', '{"status": "504"}');
+		}, 60000);
 	}
 }
 

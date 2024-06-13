@@ -40,7 +40,7 @@ client.once(Events.ClientReady, async c => {
 
 	if (esiUsers) {
 		for (const esiUser of esiUsers) {
-			killboardSubscriber.newbieMap.set(esiUser.character_name as string, esiUser.character_id.toString());
+			killboardSubscriber.newbieMap.set(esiUser.character_name, esiUser.character_id.toString());
 		}
 	}
 
@@ -49,9 +49,9 @@ client.once(Events.ClientReady, async c => {
 
 	setDiscordPresence(client, '킬보드 감시 중');
 
-	log.info('registing killmail post channels...');
-	if (!process.env.DISCORD_KM_POST_CHANNEL_ID || !process.env.DISCORD_NEWBEE_CHANNEL_ID) {throw new Error('DISCORD_KM_POST_CHANNEL_ID or DISCORD_NEWBEE_CHANNEL_ID is not defined.');}
-	const newbieChannel = client.channels.cache.get(process.env.DISCORD_NEWBEE_CHANNEL_ID) as TextChannel;
+	log.info('registering killmail post channels...');
+	if (!process.env.DISCORD_KM_POST_CHANNEL_ID || !process.env.DISCORD_NEWBIE_CHANNEL_ID) {throw new Error('DISCORD_KM_POST_CHANNEL_ID or DISCORD_NEWBIE_CHANNEL_ID is not defined.');}
+	const newbieChannel = client.channels.cache.get(process.env.DISCORD_NEWBIE_CHANNEL_ID) as TextChannel;
 	const killmailPostChannel = client.channels.cache.get(process.env.DISCORD_KM_POST_CHANNEL_ID) as TextChannel;
 
 	if (!newbieChannel || !killmailPostChannel) {throw new Error('Channel ID is Invalid');}
@@ -62,10 +62,15 @@ client.once(Events.ClientReady, async c => {
 	void killboardSubscriber.createSocketConnection();
 });
 
+/**
+ * 디스코드 서버에서 멤버 역할 변경 로그가 발생하면 실행됩니다.
+ */
 client.on(Events.GuildAuditLogEntryCreate, async (auditLog, guild) => {
-	if (auditLog.action != AuditLogEvent.MemberRoleUpdate || auditLog.executorId === '1066230195473883136') return;
+	if (auditLog.action != AuditLogEvent.MemberRoleUpdate) return;
 
 	const nickname = await getAuditTargetNickname(auditLog, guild);
+	// 닉네임이 없으면 니수와 맴버가 아닌 것으로 간주하고 건너뜁니다.
+	if (!nickname) return;
 	void reflectNewbieRoleChange(auditLog, nickname, add, remove);
 });
 
@@ -83,7 +88,7 @@ function add(nickname: string) {
 				return;
 			}
 			for (const esiUser of esiUsers) {
-				killboardSubscriber.newbieMap.set(esiUser.character_name as string, esiUser.character_id.toString());
+				killboardSubscriber.newbieMap.set(esiUser.character_name, esiUser.character_id.toString());
 			}
 		});
 }

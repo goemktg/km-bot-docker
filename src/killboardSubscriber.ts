@@ -18,7 +18,14 @@ export class KillboardSubscriber {
 		this.socket.on('open', () => {
 			log.info('Created socket connection with zKillboard.');
 
-			void this.subscribeToKillboard();
+			const subscribingObject: object = {
+				'action': 'sub',
+				'channel': 'killstream',
+			};
+
+			(this.socket as WebSocket).send(JSON.stringify(subscribingObject));
+			log.debug(JSON.stringify(subscribingObject));
+			log.info('Subscribed to kill feed.');
 		});
 
 		this.socket.on('message', (message: string) => {
@@ -34,58 +41,50 @@ export class KillboardSubscriber {
 		});
 	}
 
-	subscribeToKillboard() {
-		const subscribingObject: object = {
-			'action': 'sub',
-			'channel': 'killstream',
-		};
-
-		(this.socket as WebSocket).send(JSON.stringify(subscribingObject));
-		log.debug(JSON.stringify(subscribingObject));
-		log.info('Subscribed to kill feed.');
-	}
-
 	processKillmail(response: APIKillboardResponse) {
 		log.debug(`Killmail detected: ${response.killmail_id}`);
-		log.debug(response);
+		log.trace(response);
 
-		if (this.isNewbieKillmail(response.attackers, response.victim)) {
+		if (this.newbieChannel === undefined || this.killmailPostChannel === undefined) {throw new Error('Channel is not defined.');}
+
+		switch (this.findOutKillmailType(response)) {
+		case 0:
 			log.info('Newbie killmail detected! Posting to channel...');
-			void (this.newbieChannel as TextChannel).send(`뉴비 연관 킬메일 발생! https://zkillboard.com/kill/${response.killmail_id}/`);
-		}
-
-		if (this.isAllianceKillmail(response.attackers) && response.zkb.totalValue >= 100000000) {
+			void this.newbieChannel.send(`뉴비 연관 킬메일 발생! https://zkillboard.com/kill/${response.killmail_id}/`);
+			break;
+		case 1:
 			log.info('High value killmail detected! Posting to channel...');
-			void (this.killmailPostChannel as TextChannel).send(`https://zkillboard.com/kill/${response.killmail_id}/`);
+			void this.killmailPostChannel.send(`https://zkillboard.com/kill/${response.killmail_id}/`);
+			break;
+		default:
 		}
 
 		log.debug(response.victim.character_id);
 	}
 
-	isNewbieKillmail(attackers: KillmailAttacker[], victim: KillmailVictim) {
-		if (victim.character_id && this.newbieMap.has(victim.character_id.toString())) return true;
 
-		const attackerIds = attackers.map(attacker => attacker.character_id);
-		log.debug(attackerIds);
+	/**
+	 * 킬메일이 뉴비 킬메일인지 고액 킬메일인지 아무것도 아닌지 판단하여 맞는 타입을 리턴합니다.
+	 * @returns {0: 뉴비 킬메일| 1: 고액 킬메일| 2: 아무것도 아님}
+	 */
+	findOutKillmailType(response: APIKillboardResponse) : 0 | 1 | 2 {
+		// 뉴비가 사망
+		if (this.newbieMap.has(response.victim.character_id.toString())) return 0;
+		const isExpansiveKillmail = response.zkb.totalValue >= 100000000;
 
-		if (attackerIds.filter(attackerId => this.newbieMap.has(attackerId?.toString() ?? '')).length > 0) return true;
+		for (const attacker of response.attackers) {
+			// 뉴비가 킬
+			if (this.newbieMap.has(attacker.character_id.toString())) return 0;
+			else if (isExpansiveKillmail || attacker.alliance_id === 99010412) return 1;
+		}
 
-		return false;
-	}
-
-	isAllianceKillmail(attackers: KillmailAttacker[]) {
-		const attackerAllianceIds = attackers.map(attacker => (attacker.alliance_id)) as number[];
-		log.debug(attackerAllianceIds);
-
-		if (attackerAllianceIds.includes(99010412)) return true;
-
-		return false;
+		return 2;
 	}
 }
 
 export interface EveCharacterBase {
     character_id: number,
-    character_name?: string,
+    character_name: string,
 }
 
 interface APIKillboardResponse {
@@ -98,17 +97,17 @@ interface APIKillboardResponse {
 }
 
 interface KillmailCharacterBase {
-    character_id?: number,
-    corporation_id?: number,
+    character_id: number,
+    corporation_id: number,
     ship_type_id: number,
 }
 
 interface KillmailAttacker extends KillmailCharacterBase {
-    alliance_id?: number,
+    alliance_id: number,
     damage_done: number,
     final_blow: boolean,
     security_status: number,
-    weapon_type_id?: number,
+    weapon_type_id: number,
 }
 
 interface KillmailVictim extends KillmailCharacterBase {

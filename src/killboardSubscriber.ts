@@ -79,16 +79,27 @@ export class KillboardSubscriber {
 	findOutKillmailType(response: APIKillboardResponse) : 0 | 1 | 2 {
 		log.debug(response);
 		// 뉴비가 사망
-		if (this.newbieMap.has(response.victim.character_id.toString())) return 0;
+		if (this.newbieMap.has(this.getTypeSafeIdString(response.victim))) return 0;
 		const isExpansiveKillmail = response.zkb.totalValue >= 100000000;
 
 		for (const attacker of response.attackers) {
 			// 뉴비가 킬
-			if (this.newbieMap.has(attacker.character_id.toString())) return 0;
-			else if (isExpansiveKillmail || attacker.alliance_id === 99010412) return 1;
+			if (this.newbieMap.has(this.getTypeSafeIdString(attacker))) return 0;
+			// 얼라이언스킬 + 100M 이상 킬
+			else if (isExpansiveKillmail && attacker.alliance_id === 99010412) return 1;
 		}
 
 		return 2;
+	}
+
+	getTypeSafeIdString(killmailCharacter: KillmailAttacker | KillmailVictim): string {
+		if (killmailCharacter.character_id === undefined) {
+			log.warn('Character ID is not defined. return null');
+			return 'null';
+		}
+		else {
+			return killmailCharacter.character_id.toString();
+		}
 	}
 
 	/**
@@ -117,7 +128,7 @@ interface APIKillboardResponse {
 }
 
 interface KillmailCharacterBase {
-    character_id: number,
+    character_id?: number,
     corporation_id: number,
     ship_type_id: number,
 }

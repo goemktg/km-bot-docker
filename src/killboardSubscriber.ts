@@ -8,10 +8,14 @@ export class KillboardSubscriber {
 	private socket: WebSocket | undefined;
 	public newbieChannel: TextChannel | undefined;
 	public killmailPostChannel: TextChannel | undefined;
-	private timeout: NodeJS.Timeout | undefined;
+	private timeout: NodeJS.Timeout[];
 
 	constructor() {
 		this.newbieMap = new Map();
+		this.timeout = [];
+
+		// 기본 상태 504로 설정
+		fs.writeFileSync('status.json', '{"status": "504"}');
 	}
 
 	createSocketConnection() {
@@ -29,7 +33,6 @@ export class KillboardSubscriber {
 			log.debug(JSON.stringify(subscribingObject));
 			log.info('Subscribed to kill feed.');
 
-			fs.writeFileSync('status.json', '{"status": "ok"}');
 			this.startWriteStatus();
 		});
 
@@ -38,8 +41,11 @@ export class KillboardSubscriber {
 
 			if (this.timeout === undefined) {throw new Error('Timeout is not defined.');}
 
-			clearTimeout(this.timeout);
+			fs.writeFileSync('status.json', '{"status": "ok"}');
+
+			// timeout 을 먼저 추가함 (하나의 timeout을 유지하기 위해)
 			this.startWriteStatus();
+			clearTimeout(this.timeout.shift());
 
 			void this.processKillmail(JSON.parse(message) as APIKillboardResponse);
 		});
@@ -92,13 +98,13 @@ export class KillboardSubscriber {
 		return 2;
 	}
 
-	getTypeSafeIdString(killmailCharacter: KillmailAttacker | KillmailVictim): string {
-		if (killmailCharacter.character_id === undefined) {
-			log.warn('Character ID is not defined. return null');
+	getTypeSafeIdString(killmailActor: KillmailAttacker | KillmailVictim | KillmailNPCBase): string {
+		// character_id 가 없는 경우.
+		if (!('character_id' in killmailActor)) {
 			return 'null';
 		}
 		else {
-			return killmailCharacter.character_id.toString();
+			return killmailActor.character_id.toString();
 		}
 	}
 
@@ -106,10 +112,10 @@ export class KillboardSubscriber {
 	 * 킬메일 소캣 프로그래밍의 상태를 status.json 파일에 저장합니다.
 	 */
 	startWriteStatus() {
-		this.timeout = setTimeout(() => {
+		this.timeout.push(setTimeout(() => {
 			log.error('zkillboard socket is not responding...');
 			fs.writeFileSync('status.json', '{"status": "504"}');
-		}, 60000);
+		}, 60000));
 	}
 }
 
@@ -128,9 +134,17 @@ interface APIKillboardResponse {
 }
 
 interface KillmailCharacterBase {
-    character_id?: number,
+    character_id: number,
     corporation_id: number,
     ship_type_id: number,
+}
+
+interface KillmailNPCBase {
+	damage_done: number,
+	faction_id: number,
+	final_blow: boolean,
+	security_status: number,
+	ship_type_id: number,
 }
 
 interface KillmailAttacker extends KillmailCharacterBase {

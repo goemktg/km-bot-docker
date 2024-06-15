@@ -57,6 +57,7 @@ export class KillboardSubscriber {
         "Socket connection with ZKillboard has been closed. Attempting to reconnect...",
       );
 
+      this.socket = new WebSocket("wss://zkillboard.com/websocket/");
       this.createSocketConnection();
     });
   }

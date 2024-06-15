@@ -8,14 +8,11 @@ export class KillboardSubscriber {
 	private socket: WebSocket | undefined;
 	public newbieChannel: TextChannel | undefined;
 	public killmailPostChannel: TextChannel | undefined;
-	private timeout: NodeJS.Timeout[];
+	private lastTriggeredTime: number;
 
 	constructor() {
 		this.newbieMap = new Map();
-		this.timeout = [];
-
-		// 기본 상태 504로 설정
-		fs.writeFileSync('status.json', '{"status": "504"}');
+		this.lastTriggeredTime = Date.now();
 	}
 
 	createSocketConnection() {
@@ -30,22 +27,29 @@ export class KillboardSubscriber {
 			};
 
 			(this.socket as WebSocket).send(JSON.stringify(subscribingObject));
-			log.debug(JSON.stringify(subscribingObject));
+			log.trace(JSON.stringify(subscribingObject));
 			log.info('Subscribed to kill feed.');
 
-			this.startWriteStatus();
+			// 30초마다 새 킬메일이 30초 이내에 발생했는지 확인합니다.
+			setInterval(() => {
+				const elapsedTime = Date.now() - this.lastTriggeredTime;
+				log.debug(elapsedTime);
+
+				if (elapsedTime > 30000) {
+					log.error('Zkillboard is not sending killmails.');
+					fs.writeFileSync('status.json', '{"status": "not ok"}');
+				}
+				else {
+					fs.writeFileSync('status.json', '{"status": "ok"}');
+				}
+			}, 30000);
 		});
 
 		this.socket.on('message', (message: string) => {
 			log.trace(`Received message from server: ${message}`);
 
-			if (this.timeout === undefined) {throw new Error('Timeout is not defined.');}
-
-			fs.writeFileSync('status.json', '{"status": "ok"}');
-
-			// timeout 을 먼저 추가함 (하나의 timeout을 유지하기 위해)
-			this.startWriteStatus();
-			clearTimeout(this.timeout.shift());
+			// lastTriggeredTime 을 업데이트합니다.
+			this.lastTriggeredTime = Date.now();
 
 			void this.processKillmail(JSON.parse(message) as APIKillboardResponse);
 		});
@@ -75,7 +79,7 @@ export class KillboardSubscriber {
 		default:
 		}
 
-		log.debug(response.victim.character_id);
+		log.trace(response.victim.character_id);
 	}
 
 	/**
@@ -83,7 +87,7 @@ export class KillboardSubscriber {
 	 * @returns {0: 뉴비 킬메일| 1: 고액 킬메일| 2: 아무것도 아님}
 	 */
 	findOutKillmailType(response: APIKillboardResponse) : 0 | 1 | 2 {
-		log.debug(response);
+		log.trace(response);
 		// 뉴비가 사망
 		if (this.newbieMap.has(this.getTypeSafeIdString(response.victim))) return 0;
 		const isExpansiveKillmail = response.zkb.totalValue >= 100000000;
@@ -106,16 +110,6 @@ export class KillboardSubscriber {
 		else {
 			return killmailActor.character_id.toString();
 		}
-	}
-
-	/**
-	 * 킬메일 소캣 프로그래밍의 상태를 status.json 파일에 저장합니다.
-	 */
-	startWriteStatus() {
-		this.timeout.push(setTimeout(() => {
-			log.error('zkillboard socket is not responding...');
-			fs.writeFileSync('status.json', '{"status": "504"}');
-		}, 60000));
 	}
 }
 

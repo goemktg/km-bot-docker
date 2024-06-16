@@ -28,7 +28,6 @@ const client = new Client({
     GatewayIntentBits.GuildModeration,
   ],
 });
-const killboardSubscriber = new KillboardSubscriber();
 
 void client.login(process.env.DISCORD_TOKEN);
 
@@ -39,6 +38,7 @@ client.once(Events.ClientReady, (c) => {
   const guilds = client.guilds.cache.values();
 
   const getNewbieInfos = [];
+  const newbieMapTemp = new Map<string, string>();
   for (const guild of guilds) {
     log.info(`Loading newbie data from ${guild.name}/${guild.id}...`);
 
@@ -51,14 +51,12 @@ client.once(Events.ClientReady, (c) => {
 
         for (const nickname of newbieNames) {
           if (!nickname) throw new Error("member.nickname is not defined.");
-          killboardSubscriber.newbieMap.set(nickname, "");
+          newbieMapTemp.set(nickname, "");
         }
 
         const esiRequester = new EsiRequester();
         const esiUsers = (
-          await esiRequester.getIdsFromNames(
-            Array.from(killboardSubscriber.newbieMap.keys()),
-          )
+          await esiRequester.getIdsFromNames(Array.from(newbieMapTemp.keys()))
         ).characters?.map((item) => ({
           character_id: item.id,
           character_name: item.name,
@@ -66,7 +64,7 @@ client.once(Events.ClientReady, (c) => {
 
         if (esiUsers) {
           for (const esiUser of esiUsers) {
-            killboardSubscriber.newbieMap.set(
+            newbieMapTemp.set(
               esiUser.character_name,
               esiUser.character_id.toString(),
             );
@@ -101,52 +99,52 @@ client.once(Events.ClientReady, (c) => {
   if (!newbieChannel || !killmailPostChannel) {
     throw new Error("Channel ID is Invalid");
   }
-  killboardSubscriber.newbieChannel = newbieChannel;
-  killboardSubscriber.killmailPostChannel = killmailPostChannel;
   log.info("registered killmail post channels.");
+  const killboardSubscriber = new KillboardSubscriber(
+    newbieChannel,
+    killmailPostChannel,
+    newbieMapTemp,
+  );
 
-  void killboardSubscriber.createSocketConnection();
-});
+  function add(nickname: string) {
+    const esiRequester = new EsiRequester();
+    void esiRequester.getIdsFromNames([nickname]).then((esiUsersResponse) => {
+      const esiUsers = esiUsersResponse.characters?.map((item) => ({
+        character_id: item.id,
+        character_name: item.name,
+      })) as EveCharacterBase[];
 
-/**
- * 디스코드 서버에서 멤버 역할 변경 로그가 발생하면 실행됩니다.
- */
-client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
-  if (auditLog.action != AuditLogEvent.MemberRoleUpdate) return;
+      if (esiUsers.length === 0) {
+        log.error("ESI returned no character names. Skipping...");
+        return;
+      }
+      for (const esiUser of esiUsers) {
+        killboardSubscriber.newbieMap.set(
+          esiUser.character_name,
+          esiUser.character_id.toString(),
+        );
+        logNewbieMap();
+      }
+    });
+  }
 
-  void (async () => {
-    const nickname = await getAuditTargetNickname(auditLog, guild);
-    void reflectNewbieRoleChange(auditLog, nickname, add, remove);
-  })();
-});
+  function remove(nickname: string) {
+    killboardSubscriber.newbieMap.delete(nickname);
+    logNewbieMap();
+  }
+  /**
+   * 디스코드 서버에서 멤버 역할 변경 로그가 발생하면 실행됩니다.
+   */
+  client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
+    if (auditLog.action != AuditLogEvent.MemberRoleUpdate) return;
 
-function add(nickname: string) {
-  const esiRequester = new EsiRequester();
-  void esiRequester.getIdsFromNames([nickname]).then((esiUsersResponse) => {
-    const esiUsers = esiUsersResponse.characters?.map((item) => ({
-      character_id: item.id,
-      character_name: item.name,
-    })) as EveCharacterBase[];
-
-    if (esiUsers.length === 0) {
-      log.error("ESI returned no character names. Skipping...");
-      return;
-    }
-    for (const esiUser of esiUsers) {
-      killboardSubscriber.newbieMap.set(
-        esiUser.character_name,
-        esiUser.character_id.toString(),
-      );
-      logNewbieMap();
-    }
+    void (async () => {
+      const nickname = await getAuditTargetNickname(auditLog, guild);
+      void reflectNewbieRoleChange(auditLog, nickname, add, remove);
+    })();
   });
-}
 
-function remove(nickname: string) {
-  killboardSubscriber.newbieMap.delete(nickname);
-  logNewbieMap();
-}
-
-function logNewbieMap() {
-  log.info(killboardSubscriber.newbieMap);
-}
+  function logNewbieMap() {
+    log.info(killboardSubscriber.newbieMap);
+  }
+});

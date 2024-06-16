@@ -13,7 +13,7 @@ import {
   reflectNewbieRoleChange,
 } from "./library/functions";
 import { EsiRequester } from "./library/handlers/EsiRequester";
-import { EveCharacterBase, KillboardSubscriber } from "./killboardSubscriber";
+import { EveCharacterBase, KillboardSubscriber } from "./KillboardSubscriber";
 import log from "loglevel";
 
 loadEnvironmentVariables();

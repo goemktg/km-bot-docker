@@ -21,6 +21,26 @@ export class KillboardSubscriber {
     this.killmailPostChannel = killmailPostChannel;
     this.socket = new WebSocket("wss://zkillboard.com/websocket/");
 
+    // 30초마다 새 킬메일이 30초 이내에 발생했는지 확인합니다.
+    setInterval(() => {
+      const elapsedTime = Date.now() - this.lastTriggeredTime;
+      log.debug(elapsedTime);
+
+      if (elapsedTime > 30000) {
+        log.error(
+          "Zkillboard is not sending killmails. trying to reconnect...",
+        );
+        this.socket.close();
+        fs.writeFileSync("status.json", '{"status": "not ok"}');
+      } else {
+        fs.writeFileSync("status.json", '{"status": "ok"}');
+      }
+    }, 30000);
+
+    this.initializeZkillboardSocketEvents();
+  }
+
+  initializeZkillboardSocketEvents() {
     this.socket.on("open", () => {
       log.info("Created socket connection with zKillboard.");
 
@@ -28,9 +48,6 @@ export class KillboardSubscriber {
         action: "sub",
         channel: "killstream",
       };
-
-      // 이 딜레이는 봇 시작시 정보를 받아올 때 까지 대기할수 있게 함
-      log.info("waiting 30 seconds to prevent spam");
 
       this.socket.send(JSON.stringify(subscribingObject));
       log.trace(JSON.stringify(subscribingObject));
@@ -50,23 +67,10 @@ export class KillboardSubscriber {
       log.error(
         "Socket connection with ZKillboard has been closed. Attempting to reconnect...",
       );
+
+      this.socket = new WebSocket("wss://zkillboard.com/websocket/");
+      this.initializeZkillboardSocketEvents();
     });
-
-    // 30초마다 새 킬메일이 30초 이내에 발생했는지 확인합니다.
-    setInterval(() => {
-      const elapsedTime = Date.now() - this.lastTriggeredTime;
-      log.debug(elapsedTime);
-
-      if (elapsedTime > 30000) {
-        log.error(
-          "Zkillboard is not sending killmails. trying to reconnect...",
-        );
-        this.socket.close();
-        fs.writeFileSync("status.json", '{"status": "not ok"}');
-      } else {
-        fs.writeFileSync("status.json", '{"status": "ok"}');
-      }
-    }, 30000);
   }
 
   processKillmail(response: APIKillboardResponse) {

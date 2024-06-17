@@ -9,6 +9,7 @@ export class KillboardSubscriber {
   private newbieChannel: TextChannel;
   private killmailPostChannel: TextChannel;
   private lastTriggeredTime: number;
+  private notRespondingCount: number;
 
   constructor(
     newbieChannel: TextChannel,
@@ -19,6 +20,7 @@ export class KillboardSubscriber {
     this.lastTriggeredTime = Date.now();
     this.newbieChannel = newbieChannel;
     this.killmailPostChannel = killmailPostChannel;
+    this.notRespondingCount = 0;
     this.socket = new WebSocket("wss://zkillboard.com/websocket/");
 
     // 30초마다 새 킬메일이 30초 이내에 발생했는지 확인합니다.
@@ -27,10 +29,14 @@ export class KillboardSubscriber {
       log.debug(elapsedTime);
 
       if (elapsedTime > 30000) {
-        log.error(
-          "Zkillboard is not sending killmails. trying to reconnect...",
-        );
-        this.socket.close();
+        log.error("Zkillboard is not sending killmails....");
+        if (this.notRespondingCount >= 10) {
+          log.error("Zkillboard is not responding. Trying to reconnect...");
+          this.socket.close();
+          this.notRespondingCount = 0;
+        }
+
+        this.notRespondingCount++;
         fs.writeFileSync("status.json", '{"status": "not ok"}');
       } else {
         fs.writeFileSync("status.json", '{"status": "ok"}');
@@ -57,8 +63,8 @@ export class KillboardSubscriber {
     this.socket.on("message", (message: string) => {
       log.trace(`Received message from server: ${message}`);
 
-      // lastTriggeredTime 을 업데이트합니다.
       this.lastTriggeredTime = Date.now();
+      this.notRespondingCount = 0;
 
       void this.processKillmail(JSON.parse(message) as APIKillboardResponse);
     });
